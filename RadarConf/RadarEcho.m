@@ -1,0 +1,64 @@
+% 雷达回波获取
+% 输入1：雷达结构体
+% 输入2：目标结构体
+% 输入3：距离FFT点数
+% 输入4：速度FFT点数
+% 单目标情形下
+function [RadarPulse, RangeProfile, RangeDoppler] = RadarEcho(Radar, Target, RangeFNum, DopplerFNum)
+    if nargin == 2
+        RangeFNum = 2048;
+        DopplerFNum = 512;
+    end
+    RadarPos = Radar.Position;
+    TargetPos = Target.Position;
+    % 接收功率
+    Pr = RadarFunction(Radar, Target);
+    % 延迟时间
+    tau = 2 * norm(RadarPos - TargetPos) / Radar.c;
+    % 获取Index
+    delayIndex = fix(tau * Radar.realTimeFactor);
+    % 回波获取
+    Echo = [zeros(1, delayIndex) Radar.Waveform];
+    % 径向速度
+    Velo = Target.RadialVelo(RadarPos);
+    % 多普勒频率
+    Fd   = 2 * Velo / Radar.Lambda;
+    % 每段信号都存在一定多普勒 计算相位差
+    DeltaFai = 4 * pi * Velo * Radar.Tc / Radar.Lambda;
+    % 截取信号
+    Echo = Pr * Echo(1: Radar.SignalLength); % + wgn(1, Radar.SignalLength, -110);
+    % 混频信号
+    Mixed = Echo .* conj(Radar.Waveform);
+    % 降采样后
+    Number = Radar.PRI * Radar.Fs; % 降采样点数
+    Index  = linspace(1, Radar.SignalLength, Number);
+    DownSample = Mixed(fix(Index));
+    % 转换为脉冲 x 时序矩阵
+    SinglePulse = fix(Radar.SingleLength * Radar.Fs);
+    RadarPulse = zeros(Radar.Nc, SinglePulse);
+    for ii = 1:Radar.Nc
+        RadarPulse(ii, :) = DownSample((ii - 1) * SinglePulse + 1: ii * SinglePulse) * exp(1j * DeltaFai * (ii - 1));
+    end
+
+    % 求得目标方位角
+    theta = atan2(-RadarPos(2) + TargetPos(2), -RadarPos(1) + TargetPos(1));
+    RadarChannels = DownSample' * Radar.SteerVector(theta);
+
+    % 最大探测距离
+    Rmax = Radar.Fs * Radar.c / 2 / Radar.K;
+    % 最大探测速度
+    Vmax = Radar.Lambda / 4 / Radar.Tc;
+    % 探测距离索引
+    RLinspace = linspace(0, Rmax, RangeFNum);
+    % 探测速度索引
+    VLinspace = linspace(-Vmax, Vmax, DopplerFNum);
+    % MTI （无静态杂波 不考虑）
+    % RadarPulse = RadarPulse(10:end, :) - RadarPulse(1:end-9, :);
+    % 距离谱
+    RangeProfile = fft(RadarPulse', RangeFNum);
+    % 距离-多普勒谱
+    RangeDoppler = fftshift(fft(RangeProfile, DopplerFNum, 2), 2);
+    % 展示结果
+    figure(10000)
+    imagesc(VLinspace, RLinspace, abs(RangeDoppler))
+end

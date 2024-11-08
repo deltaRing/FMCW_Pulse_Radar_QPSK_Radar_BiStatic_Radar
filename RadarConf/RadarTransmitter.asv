@@ -1,0 +1,53 @@
+% 雷达发射机类
+% Fs 采样率
+% Nc Chirp数目
+% PRI 脉冲间隔时间
+% Tc  Chirp时间
+% f0  载频
+% K   调频斜率
+% Position: 1 x 3
+% Velocity: 1 x 3
+%
+% FMCW 波形
+function FMCW = RadarTransmitter(Fs, ...
+    Nc, PRI, Tc, f0, K, Position, Velocity)
+    
+    if nargin == 0
+        Fs  = 20e6; % by default the Fs is 2000 MHz
+        Nc  = 64;
+        PRI = 10e-3; % 10ms
+        Tc  = 100e-6; % 100us
+        f0  = 24e9;   % 24GHz
+        K   = 10e12;  % 10MHz/us 
+        % B = 1e9;    % 带宽有一个G
+        Position = [0 0 0];
+        Velocity = [0 0 0];
+    end
+
+    FMCW.Fs = Fs;
+    FMCW.Nc = Nc; % 脉冲数目
+    FMCW.PRI = PRI;
+
+    if Nc * Tc >= PRI
+        error("RadarTransmitter: Chirp Number multiply the Chirp Time ..." + ...
+            " cannot greater than PRI");
+    end
+
+    FMCW.Tc = Tc;
+    FMCW.f0 = f0;
+    FMCW.K  = K;
+    FMCW.B  = K * Tc;
+    
+    realTimeFactor = 1 / (1 / K / Tc / 2);
+
+    FMCW.Waveform = zeros(1, fix(realTimeFactor * PRI));
+    t   = linspace(0, Tc, fix(realTimeFactor * Tc));
+    LFM = exp(1j * pi * K * t.^2);
+    % 生成多个脉冲
+    for ii = 1:Nc
+        FMCW.Waveform((ii-1) * fix(realTimeFactor * Tc) + 1: ...
+            ii * fix(realTimeFactor * Tc)) = LFM;
+    end
+    FMCW.Position = Position;
+    FMCW.Velocity = Veloc
+end

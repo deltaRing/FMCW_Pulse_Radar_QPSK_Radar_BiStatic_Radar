@@ -1,0 +1,25 @@
+% 点目标
+% 输入1：坐标 Position (1 x 3)
+% 输入2：速度 Velocity (1 x 3)
+% 输入3：RCS 雷达反射截面积
+% 
+%
+%
+function PointTarget(Position, Velocity, RCS)
+    Target.Position = Position;
+    Target.Velocity = Velocity;
+    Target.RCS = RCS;
+    % light speed
+    Target.c   = 3e8; 
+
+    % 目标位置更新
+    Target.Update = @(t) Target.Position + Target.Velocity * t;
+    % 计算回波延迟
+    Target.Tau   = @(Position) 2 * norm(Position - Target.Position) / ...
+        Target.c;
+    % 计算相对速度
+    Target.RadialVelo = @(Position) (Position - Target.Position) * Velocity / ...
+        norm(Position - Target.Position);
+    % 计算相对方位角度
+    Target.TransAzimuth = 
+end

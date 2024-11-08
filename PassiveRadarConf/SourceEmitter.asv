@@ -1,0 +1,50 @@
+% 随机QPSK（4个码元）
+% 码元持续时间 Tc
+% 持续时间     Ts
+% 采样率       Fs
+% 载频         F0
+% 位置         Position
+% 速度         Velocity
+function QPSK = SourceEmitter(Tc, Ts, Fs, F0, Position, Velocity)
+
+if (nargin == 0)
+    Tc = 100e-6;
+    Ts = 10e-3;
+    Fs = 20e6;
+    F0 = 2.4e9;
+    Position = [100 100 500];
+    Velocity = [0 0 0];
+end
+
+B = Fs / 2; % 带宽
+Nc = round(Ts / Tc); % 码元数量
+realTimeFactor = 1 / F0 / 2; % 实时时间
+
+QPSK.B = B;
+QPSK.realTimeFactor = realTimeFactor;
+
+QPSK.Tc = Tc;
+QPSK.Ts = Ts;
+QPSK.F0 = F0;
+QPSK.Nc = Nc;
+QPSK.Fai  = [0, pi / 2, pi, 3 * pi / 2];
+QPSK.Code = randi([0 3], [1 QPSK.Nc]);
+QPSK.C    = 3e8; % 光速
+
+QPSK.WaveForm = [];
+t             = 0:realTimeFactor:Tc-realTimeFactor; 
+QPSK.t        = t;
+T             = 0:realTimeFactor:Ts-realTimeFactor;
+QPSK.T        = t * Nc;
+
+QPSK.WaveForm = zeros(1, length(T));
+
+for ii = 1:QPSK.Nc
+    WaveForm = exp(1j * 2 * pi * F0 * t + 1j * QPSK.Fai(QPSK.Code(ii) + 1));
+    QPSK.WaveForm((ii - 1) * length(t) + 1:ii * length(t)) = WaveForm;
+end
+
+QPSK.Position = Position;
+QPSK.Velocity = Velocity;
+
+end
