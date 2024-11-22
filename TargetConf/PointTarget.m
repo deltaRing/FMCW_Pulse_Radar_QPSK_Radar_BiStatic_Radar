@@ -35,5 +35,5 @@ function Target = PointTarget(Position, Velocity, RCS)
     % 计算双站相对径向速度
     Target.BiRadialVelo = @(PT, PR) sum(((Target.Position - PT) / ...
         norm(PT - Target.Position) + (Target.Position - PR) / ...
-        norm(PR - Target.Position)) .* Velocity);
+        norm(PR - Target.Position)) .* Velocity) / 2;
 end
