@@ -9,7 +9,7 @@ function [Sref, Ssurv] = BiRadarEcho(Transmitter, ...
     PulseNum)
 
     if nargin == 3
-        PulseNum = 64;
+        PulseNum = 128;
     end
     
     TargetNum = length(Target);
@@ -57,19 +57,19 @@ function [Sref, Ssurv] = BiRadarEcho(Transmitter, ...
 
     % 目标信号
     for tt = 1:TargetNum
+        % 回波计算
         Echoes  = [zeros(1, fix(TauTarIndex(tt) / Transmitter.realTimeFactor)) Signal];
         TarAmp  = Amplitude(Transmitter, Target{tt}, Receiver);
-        Signal  = 1 .* Echoes(1:PulseNum * Transmitter.LPRI);
+        Signal_ = 1 .* Echoes(1:PulseNum * Transmitter.LPRI);
         % 加相位
         Phase   = zeros(1, PulseNum * Transmitter.LPRI);
         for pp = 1:PulseNum
-            DeltaFai = 4 * pi * Velo(tt) * Transmitter.LPRI / Transmitter.Lambda;
+            DeltaFai = 4 * pi * Velo(tt) * Transmitter.PRI / Transmitter.Lambda;
             Phase((pp - 1) * Transmitter.LPRI + 1: pp * Transmitter.LPRI) = ...
                 exp(1j * DeltaFai * (pp - 1));
         end
-        Ssurv = Ssurv + Signal .* Phase;
+        Ssurv = Ssurv + Signal_ .* Phase;
     end
-    Ssurv = Ssurv;
 
     % Reshape
     SrefMatrix  = zeros(PulseNum, Transmitter.LPRI);
@@ -82,18 +82,30 @@ function [Sref, Ssurv] = BiRadarEcho(Transmitter, ...
     end
 
     % 脉冲压缩 填充
-    MatchFilter   = [Transmitter.MatchFilter zeros(1, Transmitter.LPRI - length(Transmitter.MatchFilter))];
+    MatchFilter   = Transmitter.MatchFilter;
     SsurvMatrixPC = zeros(PulseNum, Transmitter.LPRI);
     for pp = 1:PulseNum
-        SsurvMatrixPC(pp, :) = ifft(fft(SsurvMatrix(pp, :), Transmitter.LPRI) .* ... 
-                                        fft(MatchFilter, Transmitter.LPRI));
+        Echo  = (fft(SsurvMatrix(pp, :), Transmitter.LPRI));
+        Match = (fft(MatchFilter, Transmitter.LPRI));
+        SsurvMatrixPC(pp, :) = (ifft(Echo .* Match));
     end
-    
+
+    % 最大探测速度
+    Vmax = Transmitter.Lambda / Transmitter.PRI / 4;
+    Doppler_Axis = linspace(-Vmax, Vmax, 512); 
+    % 相对参考信号距离
+    Rmax = Transmitter.PRI * 3e8 / 2;
+    Range_Axis = linspace(0, Rmax, Transmitter.LPRI);
+    Pulse_Axis = linspace(1, PulseNum, PulseNum);
 
     figure(9998)
-    mesh(abs(SsurvMatrixPC))
+    mesh(Range_Axis, Pulse_Axis, abs(SsurvMatrixPC))
+    xlabel('距离(m)')
+    ylabel('脉冲数')
 
-    RDMap = fftshift(fft(SsurvMatrixPC, 1024));
+    RDMap = fftshift(fftshift(fft(SsurvMatrixPC, 512)), 2);
     figure(9999)
-    mesh(abs(RDMap))
+    mesh(Range_Axis, Doppler_Axis, abs(RDMap))
+    xlabel('距离(m)')
+    ylabel('多普勒(m/s)')
 end

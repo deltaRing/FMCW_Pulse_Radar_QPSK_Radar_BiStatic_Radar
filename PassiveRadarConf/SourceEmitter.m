@@ -33,7 +33,7 @@ EM.B = B;
 K      = B / Ts;
 EM.K = K;
 EM.realTimeFactor = realTimeFactor;
-
+EM.Fs  = Fs;
 EM.Tc  = Tc;
 EM.Ts  = Ts;
 EM.F0  = F0;
@@ -64,7 +64,7 @@ for ii = 1:EM.Nc
     EM.WaveForm((ii - 1) * length(tt) + 1:ii * length(tt)) = WaveForm;
 end
 % 匹配滤波器
-EM.MatchFilter = conj(EM.WaveForm);
+EM.MatchFilter = conj(fliplr([EM.WaveForm zeros(1, EM.LPRI - length(EM.WaveForm))]));
 
 % 位置
 EM.Position = Position;

@@ -1,0 +1,29 @@
+addpath PassiveRadarConf\
+
+% 定义雷达位置
+RadarPosition = [0, 0, 0];
+RadarVelocity = [0 0 0];
+RadarAccelerate = [0 0 0];
+
+Tc = 1e-6;
+Ts = 25e-6;
+B  = 20e6;
+F0 = 10e9;
+Pt = 1000e3;
+Gt = 30;
+PRI = 100e-6; % 有信号的时间 Ts PRI - Ts Idle Time
+
+Fs = 50e6;
+F0 = 10e9;
+Gr = 20;
+EM = SourceEmitter(Tc, Ts, Fs F);
+RC = SourceReceiver(Position=RadarPosition);
+
+% 定义目标
+Target1  = PointTarget([1000, 100, 10], [3, 10, 0], 10);
+Target2  = PointTarget([1000, 100, 10] + 100 * randn(), [-10, 10, 0], 10);
+
+Targets = {Target1, Target2};
+
+% 定义回波
+[Sref, Ssurv] = BiRadarEcho(Emitter, Receiver, Targets);

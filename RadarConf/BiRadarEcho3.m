@@ -23,7 +23,7 @@ function [Echos, delayIndex, Velo] = BiRadarEcho3(Radar, Target)
     Echo_ = [];
     for pp = 1:Radar.PulseNum
         % 截取信号
-        Echo = 1 * Echo(1: Radar.LPRI) .* exp(1j * DeltaFai * (pp - 1) * Radar.PRI);
+        Echo = Pr * Echo(1: Radar.LPRI) .* exp(1j * DeltaFai * (pp - 1) * Radar.PRI);
         Echo_(:, pp) = Echo;
     end 
     % + wgn(1, Radar.SignalLength, -110);
