@@ -16,13 +16,14 @@ delay = Sindex;
 Ssurv = zeros(1, N); 
 % 
 % Sref  = Sref(delay-R+1:delay+N);
+TargetPosition = [100, 500, 100];
 
-Clutter1 = PointTarget([0, 3000, 1000] + [1 1 0] * 1000, [10 10 0], 10);
-Clutter2 = PointTarget([0, 3000, 1000] + [0 1 0] * 1000, [10 5 0] * 10, 10);
-Clutter3 = PointTarget([0, 3000, 1000] + [-0.6 -0.5 0] * 3000, randn(1, 3) * 10, 10);
-Clutter4 = PointTarget([0, 3000, 1000] + [0.1 0.75 0] * 1000, randn(1, 3) * 10, 10);
-Clutter5 = PointTarget([0, 3000, 1000] + [0.5 0.25 0] * 1000, randn(1, 3) * 10, 10);
-Target   = PointTarget([0, 3000, 1000], [10 100 0], 10);
+Clutter1 = PointTarget(TargetPosition + [1 1 0] * 5000, [10 10 0], 10);
+Clutter2 = PointTarget(TargetPosition + [0 1 0] * 2500, [10 5 0] * 10, 10);
+Clutter3 = PointTarget(TargetPosition + [-0.6 -0.5 0] * 3000, randn(1, 3) * 10, 10);
+Clutter4 = PointTarget(TargetPosition + [0.1 0.75 0] * 5000, randn(1, 3) * 10, 10);
+Clutter5 = PointTarget(TargetPosition + [0.5 0.25 0] * 1000, randn(1, 3) * 10, 10);
+Target   = PointTarget(TargetPosition, [10 100 0], 10);
 
 [Echo1, delayIndex1, Velo1] = BiRadarEcho3(QPSK, Clutter1);
 [Echo2, delayIndex2, Velo2] = BiRadarEcho3(QPSK, Clutter2);
@@ -49,7 +50,9 @@ Echo   = [Echo1{1}(:,1).';
             Echo5{1}(:,1).'; 
             EchoT{1}(:,1).'];
 
-AllEcho = Echo1{1} + Echo2{1} + Echo3{1} + Echo4{1} + Echo5{1} + EchoT{1};
+CEcho = Echo1{1} + Echo2{1} + Echo3{1} + Echo4{1} + Echo5{1};
+AllEcho = CEcho + EchoT{1};
+AllEcho = AllEcho + wgn(size(AllEcho, 1), size(AllEcho, 2), 1) * 1e-6;
 
 % 最大探测速度
 Vmax = QPSK.Lambda / 4 / QPSK.PRI / QPSK.PulseNum;
@@ -58,9 +61,17 @@ Doppler_Axis = linspace(-Vmax, Vmax, 512);
 Rmax = 1/QPSK.Fs * QPSK.LPRI * 3e8;
 Range_Axis = linspace(0, Rmax, size(AllEcho, 1));
 
-output = CorFFT2D(awgn(AllEcho, 10), awgn(Sref, 10));
+% output = CorFFT2D(AllEcho, 10, awgn(Sref, 10));
+output = CorFFT(AllEcho, awgn(Sref, 10));
 figure(1000)
-mesh(linspace(1, QPSK.PulseNum, QPSK.PulseNum), Range_Axis, abs(output))
+plot(abs(output))
+
+output = CorFFT(AllEcho - CEcho - wgn(size(AllEcho, 1), size(AllEcho, 2), 1) * 1e-6, ...
+    awgn(Sref, 10));
+figure(999)
+plot(abs(output))
+
+% mesh(linspace(1, QPSK.PulseNum, QPSK.PulseNum), Range_Axis, abs(output))
 title('相对距离像')
 ylabel('距离（m）')
 xlabel('脉冲数')

@@ -3,13 +3,16 @@
 % 输入2： RadarReceiver    接收站
 % 输入3： Target           目标（多个目标）
 % 输入4： PulseNum         脉冲数目（重复次数）
-function [Sref, Ssurv] = BiRadarEcho(Transmitter, ...
+function [Sref, Ssurv, RangeProfile, RangeDoppler, AngleSignal] = ...
+    BiRadarEcho(Transmitter, ...
     Receiver, ...
     Target, ...
-    PulseNum)
+    PulseNum, ...
+    MTI_enable)
 
     if nargin == 3
         PulseNum = 128;
+        MTI_enable = 1;
     end
     
     TargetNum = length(Target);
@@ -56,11 +59,13 @@ function [Sref, Ssurv] = BiRadarEcho(Transmitter, ...
     Sref = Amp * Sref(1:PulseNum * Transmitter.LPRI);
 
     % 目标信号
+    Angles = [];
+    AngleSignal = zeros(Receiver.ReceiverNum, PulseNum * Transmitter.LPRI);
     for tt = 1:TargetNum
         % 回波计算
         Echoes  = [zeros(1, fix(TauTarIndex(tt) / Transmitter.realTimeFactor)) Signal];
         TarAmp  = Amplitude(Transmitter, Target{tt}, Receiver);
-        Signal_ = 1 .* Echoes(1:PulseNum * Transmitter.LPRI);
+        Signal_ = TarAmp .* Echoes(1:PulseNum * Transmitter.LPRI);
         % 加相位
         Phase   = zeros(1, PulseNum * Transmitter.LPRI);
         for pp = 1:PulseNum
@@ -68,6 +73,13 @@ function [Sref, Ssurv] = BiRadarEcho(Transmitter, ...
             Phase((pp - 1) * Transmitter.LPRI + 1: pp * Transmitter.LPRI) = ...
                 exp(1j * DeltaFai * (pp - 1));
         end
+        % 目标相对位置
+        RelatedPosition = Target{tt}.Position - Receiver.Position;
+        % 目标角度
+        Azimuth = atan2(RelatedPosition(2), RelatedPosition(1));
+        Angles(tt) = Azimuth;
+        SteerVector = Receiver.SteerVector(Azimuth);
+        AngleSignal = AngleSignal + (SteerVector.' * (Signal_ .* Phase));
         Ssurv = Ssurv + Signal_ .* Phase;
     end
 
@@ -77,8 +89,10 @@ function [Sref, Ssurv] = BiRadarEcho(Transmitter, ...
 
     % 重塑矩阵
     for pp = 1:PulseNum
-        SrefMatrix(pp, :)  = Sref((pp - 1) * Transmitter.LPRI + 1: pp * Transmitter.LPRI);
-        SsurvMatrix(pp, :) = Ssurv((pp - 1) * Transmitter.LPRI + 1: pp * Transmitter.LPRI);
+        SrefMatrix(pp, :)  = Sref((pp - 1) * Transmitter.LPRI + 1: pp * Transmitter.LPRI) + ...
+            randn(1, Transmitter.LPRI) * 1e-9;
+        SsurvMatrix(pp, :) = Ssurv((pp - 1) * Transmitter.LPRI + 1: pp * Transmitter.LPRI) + ...
+            randn(1, Transmitter.LPRI) * 1e-9;
     end
 
     % 脉冲压缩 填充
@@ -90,22 +104,45 @@ function [Sref, Ssurv] = BiRadarEcho(Transmitter, ...
         SsurvMatrixPC(pp, :) = (ifft(Echo .* Match));
     end
 
+    % MTI
+    SsurvMTI = [];
+    for pp = 1:PulseNum - 1
+        SsurvMTI(pp, :) = SsurvMatrixPC(pp + 1, :) - SsurvMatrixPC(pp, :);
+    end
+
     % 最大探测速度
     Vmax = Transmitter.Lambda / Transmitter.PRI / 4;
     Doppler_Axis = linspace(-Vmax, Vmax, 512); 
     % 相对参考信号距离
     Rmax = Transmitter.PRI * 3e8 / 2;
     Range_Axis = linspace(0, Rmax, Transmitter.LPRI);
-    Pulse_Axis = linspace(1, PulseNum, PulseNum);
+    if MTI_enable
+        Pulse_Axis = linspace(1, PulseNum - 1, PulseNum - 1);
+        figure(9998)
+        imagesc(Range_Axis, Pulse_Axis, abs(SsurvMTI))
+        xlabel('距离(m)')
+        ylabel('脉冲数')
 
-    figure(9998)
-    mesh(Range_Axis, Pulse_Axis, abs(SsurvMatrixPC))
-    xlabel('距离(m)')
-    ylabel('脉冲数')
+        RDMap = fftshift(fftshift(fft(SsurvMTI, 512)), 2);
+        figure(9999)
+        imagesc(Range_Axis, Doppler_Axis, abs(RDMap))
+        xlabel('距离(m)')
+        ylabel('多普勒(m/s)')
+    else
+        Pulse_Axis = linspace(1, PulseNum, PulseNum);
 
-    RDMap = fftshift(fftshift(fft(SsurvMatrixPC, 512)), 2);
-    figure(9999)
-    mesh(Range_Axis, Doppler_Axis, abs(RDMap))
-    xlabel('距离(m)')
-    ylabel('多普勒(m/s)')
+        figure(9998)
+        imagesc(Range_Axis, Pulse_Axis, abs(SsurvMatrixPC))
+        xlabel('距离(m)')
+        ylabel('脉冲数')
+
+        RDMap = fftshift(fftshift(fft(SsurvMatrixPC, 512)), 2);
+        figure(9999)
+        imagesc(Range_Axis, Doppler_Axis, abs(RDMap))
+        xlabel('距离(m)')
+        ylabel('多普勒(m/s)')
+    end
+
+    RangeProfile = SsurvMatrixPC;
+    RangeDoppler = RDMap;
 end
